@@ -1,6 +1,7 @@
 import math
 import sys
 import os
+import pprint
 from random import random
 from dotenv import load_dotenv, find_dotenv
 
@@ -18,7 +19,9 @@ spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
 def get_song():
     offset = math.floor(random() * 10000)
-    results = spotify.search(q=get_random_query(), type='track', offset=offset)
+    results = spotify.search(q=get_random_query(), type='track', offset=offset, limit=1)
+    while results['tracks']['items'][0]['preview_url'] is None:
+        results = spotify.search(q=get_random_query(), type='track', offset=offset, limit=1)
     return results
 
 def get_random_query():
@@ -32,4 +35,4 @@ def get_random_query():
         query = '%' + rnd_char + '%'
     return query
 
-print(get_song())
+get_song()
