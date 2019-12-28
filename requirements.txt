@@ -4,3 +4,4 @@ idna == 2.8
 requests == 2.22.0 
 spotipy == 2.4.4 
 urllib3 == 1.25.7
+python-dotenv == 0.10.3
