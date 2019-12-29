@@ -34,5 +34,3 @@ def get_random_query():
     else:
         query = '%' + rnd_char + '%'
     return query
-
-get_song()
