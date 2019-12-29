@@ -1,7 +1,10 @@
+import sys
+import os
 import urllib.request
 
-AUDIO_PATH = '../../data/raw/audio/'
+sys.path.append(os.getcwd())
+from constants import AUDIO_PATH
 
 def get_mp3(url, id):
-    urllib.request.urlretrieve(url + '.mp3', AUDIO_PATH + id)
+    urllib.request.urlretrieve(url + '.mp3', AUDIO_PATH + id + '.mp3')
 

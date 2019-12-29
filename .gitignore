@@ -1,3 +1,11 @@
 .env
-*.mp3
 .DS_STORE
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+*.mp3
+*.csv
