@@ -1,2 +1,2 @@
 AUDIO_PATH = 'data/raw/audio/'
-DB_SIZE = 100
+DB_SIZE = 5
