@@ -5,6 +5,9 @@ get_data:
 	$(MAKE) init
 	python src/prep/crawl.py
 
+process_data: 
+	python src/process/utility.py
+
 train: get_data
 
 run: train
