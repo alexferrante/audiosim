@@ -3,76 +3,98 @@ import os
 import numpy as np
 
 import librosa
+import librosa.display
+import librosa.core
 import soundfile as sf
 import pydub
 
 from scipy.io import wavfile
 
 import matplotlib.pyplot as plt
+from matplotlib import cm
 
 sys.path.append(os.getcwd())
-from constants import RAW_AUDIO_PATH, PROCESS_AUDIO_PATH, FRAME_SIZE, FRAME_STRIDE, NFFT, NFILT, MEL_HZ_CONST_1, MEL_HZ_CONST_2
+from constants import *
 
 class Utility:
-    def apply_hamm_window(self, frames, frame_length):
-        frames *= np.hamming(frame_length) # frames *= 0.54 - 0.46 * numpy.cos((2 * numpy.pi * n) / (frame_length - 1))  # Formula **
-        return frames
-
-    def apply_pow_spec(self, fft_res, nfft=NFFT):
-        pow_spec = ((1.0 / NFFT) * ((fft_res) ** 2))
-        return pow_spec
-        
-    def apply_fft(self, frames, nfft=NFFT):
-        fft_res = np.absolute(np.fft.rfft(frames, NFFT))
-        return fft_res
-
-    def apply_tri_filterbank(self, frames, sr=SAMPLE_RATE, nfilt=NFILT, nfft=NFFT):
-        low_freq_mel = 0
-        high_freq_mel = (MEL_HZ_CONST_1 * np.log10(1 + (sr/2) / MEL_HZ_CONST_2)) # m = 2595 * log10(1 + f / 700)
-        mel_points = np.linspace(low_freq_mel, high_freq_mel, nfilt + 2)
-        hz_points = (MEL_HZ_CONST_2 * (10**(mel_points / MEL_HZ_CONST_1) - 1))  # f = 700(10^( m / 2595) - 1)
-        b = np.floor((nfft + 1) * hz_points / sr)
-        fb = np.zeros((nfilt, int(np.floor(nfft / 2 + 1))))
-        for i in range(1, nfilt + 1):
-            f_m_btm = int(b[i - 1])
-            f_m_mid = int(b[i])
-            f_m_top = int(bin[i + 1])
-            for j in range(f_m_btm, f_m_mid):
-                fb[i - 1, j] = (j - b[i - 1]) / (b[i] - b[i - 1])
-            for j in range(f_m_mid, f_m_top):
-                fb[i - 1, j] = (b[i + 1] - j) / (b[i + 1] - b[i])
-        fb = np.dot(frames, fb.T)
-        fb = np.where(fb == 0, np.finfo(float).eps, fb)
-        fb = 20 * np.log10(fb)
-        return fb
-
-    def get_frames(self, signal, frame_size=FRAME_SIZE, frame_stride=FRAME_STRIDE, sr=SAMPLE_RATE):
-        signal_length = len(signal)
-        frame_length= len(round(frame_size * sr))
-        frame_step = int(round(frame_stride * sr))
-        n_frames = int(np.ceil(float(np.abs(signal_length - frame_length)) / frame_step))
-        p_signal_length = n_frames * frame_step + frame_length
-        z = np.zeros((p_signal_length - signal_length))
-        p_signal = np.append(signal, z)
-        indices = np.tile(np.arrange(0, frame_length), (n_frames, 1)) + np.tile(np.arrange(0, n_frames * frame_step, frame_step), (frame_length, 1)).T
-        frames = p_signal[indices.astype(np.int32, copy=False)]
-        apply_hamm_window(frames, frame_length)
-        return frames
-
-    def wav_to_mel_log(self, wav):
-        frames = get_frames(wav)
-        fft_signal = apply_fft(frames)
-        pow_signal = apply_pow_spec(fft_signal)
-        mel_spec = apply_tri_filterbank(pow_signal)
-        # OPTIONAL : sinusoidal liftering for de-emphasizing 
-        # (nframes, ncoeff) = mel_spec.shape
-        # n = numpy.arange(ncoeff)
-        # lift = 1 + (cep_lifter / 2) * numpy.sin(numpy.pi * n / cep_lifter)
-        # mel_spec *= lift  
-
     def mp3_to_wav(self, filename):
         data = pydub.AudioSegment.from_mp3(RAW_AUDIO_PATH + filename + '.mp3')
-        data.export(filename + '.wav', format="wav")
+        data.export(PROCESS_AUDIO_PATH + filename + '.wav', format='wav')
         wav = wavfile.read(PROCESS_AUDIO_PATH + filename + '.wav')[1]
+        self.wav_to_mel_log(wav)
         return wav
+
+    def get_mel_filterbank(self):
+        input_bins = (FRAME_LENGTH // 2) + 1
+        fb = np.zeros((input_bins, NUM_BANDS))
+
+        # mel-spaced peak frequencies
+        min_mel = MEL_HZ_CONST_1 * np.log1p(MEL_MIN_FREQ / MEL_HZ_CONST_2)
+        max_mel = MEL_HZ_CONST_1 * np.log1p(MEL_MAX_FREQ / MEL_HZ_CONST_2)
+        spacing = (max_mel - min_mel) / (NUM_BANDS + 1)
+        peaks_mel = min_mel + np.arange(NUM_BANDS + 2) * spacing
+        peaks_hz = MEL_HZ_CONST_2 * (np.exp(peaks_mel / MEL_HZ_CONST_1) - 1)
+        fft_freqs = np.linspace(0, SAMPLE_RATE / 2., input_bins)
+        peaks_bin = np.searchsorted(fft_freqs, peaks_hz)
+
+        for b, filt in enumerate(fb.T):
+            left_hz, top_hz, right_hz = peaks_hz[b:b+3] 
+            left_bin, top_bin, right_bin = peaks_bin[b:b+3]
+            filt[left_bin:top_bin] = ((fft_freqs[left_bin:top_bin] - left_hz) / (top_bin - left_bin))
+            filt[top_bin:right_bin] = ((right_hz - fft_freqs[top_bin:right_bin]) / (right_bin - top_bin))
+            filt[left_bin:right_bin] /= filt[left_bin:right_bin].sum()
+        return fb
     
+    def spectrogram(self, samples, batch=50):
+        if len(samples) < FRAME_LENGTH:
+            return np.empty((0, FRAME_LENGTH // 2 + 1), dtype=samples.dtype)
+        win = np.hanning(FRAME_LENGTH).astype(samples.dtype)
+        num_frames = max(0, (len(samples) - FRAME_LENGTH) // HOPSIZE + 1)
+        batch = min(batch, num_frames)
+        if batch <= 1 or not samples.flags.c_contiguous:
+            rfft = rfft_builder(samples[:FRAME_LENGTH], n=FRAME_LENGTH)
+            spect = np.vstack(np.abs(rfft(samples[pos:pos + FRAME_LENGTH] * win))
+                            for pos in range(0, len(samples) - FRAME_LENGTH + 1,
+                                            int(HOPSIZE)))
+        else:
+            rfft = rfft_builder(np.empty((batch, FRAME_LENGTH), samples.dtype),
+                                n=FRAME_LENGTH, threads=1)
+            frames = np.lib.stride_tricks.as_strided(
+                    samples, shape=(num_frames, FRAME_LENGTH),
+                    strides=(samples.strides[0] * HOPSIZE, samples.strides[0]))
+            spect = [np.abs(rfft(frames[pos:pos + batch] * win))
+                    for pos in range(0, num_frames - batch + 1, batch)]
+            if num_frames % batch:
+                spect.append(spectrogram(samples[(num_frames // batch * batch) * HOPSIZE:],
+                                                  SAMPLE_RATE, FRAME_LENGTH, batch=1))
+            spect = np.vstack(spect)
+        return spect
+    
+    def get_samples_ffmpeg(infile, sample_rate, cmd='ffmpeg'):
+        call = [cmd, "-v", "quiet", "-i", infile, "-f", "f32le",
+                "-ar", str(sample_rate), "-ac", "1", "pipe:1"]
+        samples = subprocess.check_output(call)
+        return np.frombuffer(samples, dtype=np.float32)
+
+    def extract_spect(self, filename):
+        try:
+            samples = get_samples_ffmpeg(filename, SAMPLE_RATE)
+        except Exception:
+            samples = get_samples_ffmpeg(filename, SAMPLE_RATE, cmd='avconv')
+        return spectrogram(samples)
+
+    def apply_filterbank(self, batches, filterbank):
+        for spects, labels in batches:
+            # transform all excerpts in a single dot product
+            yield (np.dot(spects.reshape(-1, spects.shape[-1]), filterbank).reshape(
+                    (spects.shape[0], spects.shape[1], -1)), labels)
+
+    def apply_logarithm(self, batches, clip=1e-7):
+        for spects, labels in batches:
+            yield np.log(np.maximum(spects, clip)), labels
+
+    def rfft_builder(self, samples, *args, **kwargs):
+        if samples.dtype == np.float32:
+            return lambda *a, **kw: np.fft.rfft(*a, **kw).astype(np.complex64)
+        else:
+            return np.fft.rfft
