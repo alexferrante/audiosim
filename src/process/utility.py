@@ -1,6 +1,7 @@
 import sys
 import os
 import numpy as np
+import subprocess
 
 import librosa
 import librosa.display
@@ -11,7 +12,6 @@ import pydub
 from scipy.io import wavfile
 
 import matplotlib.pyplot as plt
-from matplotlib import cm
 
 sys.path.append(os.getcwd())
 from constants import *
@@ -21,7 +21,6 @@ class Utility:
         data = pydub.AudioSegment.from_mp3(RAW_AUDIO_PATH + filename + '.mp3')
         data.export(PROCESS_AUDIO_PATH + filename + '.wav', format='wav')
         wav = wavfile.read(PROCESS_AUDIO_PATH + filename + '.wav')[1]
-        self.wav_to_mel_log(wav)
         return wav
 
     def get_mel_filterbank(self):
@@ -52,12 +51,12 @@ class Utility:
         num_frames = max(0, (len(samples) - FRAME_LENGTH) // HOPSIZE + 1)
         batch = min(batch, num_frames)
         if batch <= 1 or not samples.flags.c_contiguous:
-            rfft = rfft_builder(samples[:FRAME_LENGTH], n=FRAME_LENGTH)
+            rfft = self.rfft_builder(samples[:FRAME_LENGTH], n=FRAME_LENGTH)
             spect = np.vstack(np.abs(rfft(samples[pos:pos + FRAME_LENGTH] * win))
                             for pos in range(0, len(samples) - FRAME_LENGTH + 1,
                                             int(HOPSIZE)))
         else:
-            rfft = rfft_builder(np.empty((batch, FRAME_LENGTH), samples.dtype),
+            rfft = self.rfft_builder(np.empty((batch, FRAME_LENGTH), samples.dtype),
                                 n=FRAME_LENGTH, threads=1)
             frames = np.lib.stride_tricks.as_strided(
                     samples, shape=(num_frames, FRAME_LENGTH),
@@ -65,23 +64,22 @@ class Utility:
             spect = [np.abs(rfft(frames[pos:pos + batch] * win))
                     for pos in range(0, num_frames - batch + 1, batch)]
             if num_frames % batch:
-                spect.append(spectrogram(samples[(num_frames // batch * batch) * HOPSIZE:],
-                                                  SAMPLE_RATE, FRAME_LENGTH, batch=1))
+                spect.append(self.spectrogram(samples[(num_frames // batch * batch) * HOPSIZE:], batch=1))
             spect = np.vstack(spect)
         return spect
     
-    def get_samples_ffmpeg(infile, sample_rate, cmd='ffmpeg'):
+    def get_samples_ffmpeg(self, infile, cmd='ffmpeg'):
         call = [cmd, "-v", "quiet", "-i", infile, "-f", "f32le",
-                "-ar", str(sample_rate), "-ac", "1", "pipe:1"]
+                "-ar", str(SAMPLE_RATE), "-ac", "1", "pipe:1"]
         samples = subprocess.check_output(call)
         return np.frombuffer(samples, dtype=np.float32)
 
     def extract_spect(self, filename):
         try:
-            samples = get_samples_ffmpeg(filename, SAMPLE_RATE)
+            samples = self.get_samples_ffmpeg(filename)
         except Exception:
-            samples = get_samples_ffmpeg(filename, SAMPLE_RATE, cmd='avconv')
-        return spectrogram(samples)
+            samples = self.get_samples_ffmpeg(filename, cmd='avconv')
+        return self.spectrogram(samples)
 
     def apply_filterbank(self, batches, filterbank):
         for spects, labels in batches:
