@@ -67,8 +67,8 @@ def spectrogram(samples, batch=50):
         spect = np.vstack(spect)
     return spect
     
-def get_samples_ffmpeg(infile, cmd='ffmpeg'):
-    call = [cmd, "-v", "quiet", "-i", infile, "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "pipe:1"]
+def get_samples_ffmpeg(filename, cmd='ffmpeg'):
+    call = [cmd, "-v", "quiet", "-i", PROCESS_AUDIO_PATH + filename + '.wav', "-f", "f32le", "-ar", str(SAMPLE_RATE), "-ac", "1", "pipe:1"]
     samples = subprocess.check_output(call)
     return np.frombuffer(samples, dtype=np.float32)
 
@@ -99,84 +99,16 @@ def rfft_builder(samples, *args, **kwargs):
 def preemphasis(seq, coeff):
     return scipy.append(seq[0], seq[1:] - coeff * seq[:-1])
 
-# def go():
-#         wav = Utility().mp3_to_wav('2pI1zTabdot2INoDFeIrhD')
+def test():
+    spec = extract_spect('0uFnnurkT6KwgzfQ6KAvSi')
+    plt.plot(spec)
+    plt.show()
+    # D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
+    # plt.subplot(4, 2, 1)
+    # librosa.display.specshow(D, y_axis='linear')
+    # plt.colorbar(format='%+2.0f dB')
+    # plt.title('Linear-frequency power spectrogram')
 
-#         y = Utility().get_samples_ffmpeg(PROCESS_AUDIO_PATH + '2pI1zTabdot2INoDFeIrhD.wav')
-#         stft = fft.rfft(y)
-#         sr = SAMPLE_RATE
-#         spec = Utility().spectrogram(y)
+test()
 
-
-#         S = librosa.feature.melspectrogram(S=spec, sr=sr)
-
-#         # S = librosa.feature.melspectrogram(y=stft, sr=sr, n_mels=128,
-#         #                                     fmax=8000)
-
-#         plt.figure(figsize=(10, 4))
-       
-#         S_dB = librosa.power_to_db(S, ref=np.max)
-#         librosa.display.specshow(S_dB, y_axis='mel', x_axis='time', sr=sr,
-#                                 fmax=8000)
-#         plt.colorbar(format='%+2.0f dB')
-#         plt.title('Mel-frequency spectrogram')
-#         plt.tight_layout()
-#         plt.show()
-
-        # D = librosa.amplitude_to_db(np.abs(librosa.stft(y)), ref=np.max)
-        # plt.subplot(4, 2, 1)
-        # librosa.display.specshow(D, y_axis='linear')
-        # plt.colorbar(format='%+2.0f dB')
-        # plt.title('Linear-frequency power spectrogram')
-
-        # # Logarithmic scale
-        # plt.subplot(4, 2, 2)
-        # librosa.display.specshow(spec, y_axis='log')
-        # plt.colorbar(format='%+2.0f dB')
-        # plt.title('Log-frequency power spectrogram')
-
-        # # CQT scale
-
-        # CQT = librosa.amplitude_to_db(np.abs(librosa.cqt(y, sr=sr)), ref=np.max)
-        # plt.subplot(4, 2, 3)
-        # librosa.display.specshow(CQT, y_axis='cqt_note')
-        # plt.colorbar(format='%+2.0f dB')
-        # plt.title('Constant-Q power spectrogram (note)')
-
-        # plt.subplot(4, 2, 4)
-        # librosa.display.specshow(CQT, y_axis='cqt_hz')
-        # plt.colorbar(format='%+2.0f dB')
-        # plt.title('Constant-Q power spectrogram (Hz)')
-
-        # # Chromagram with pitch classes
-
-        # C = librosa.feature.chroma_cqt(y=y, sr=sr)
-        # plt.subplot(4, 2, 5)
-        # librosa.display.specshow(C, y_axis='chroma')
-        # plt.colorbar()
-        # plt.title('Chromagram')
-
-        # # Grayscale colormap (white -> black)
-
-        # plt.subplot(4, 2, 6)
-        # librosa.display.specshow(D, cmap='gray_r', y_axis='linear')
-        # plt.colorbar(format='%+2.0f dB')
-        # plt.title('Linear power spectrogram (grayscale)')
-
-        # plt.subplot(4, 2, 7)
-        # librosa.display.specshow(D, x_axis='time', y_axis='log')
-        # plt.colorbar(format='%+2.0f dB')
-        # plt.title('Log power spectrogram')
-
-        # # Tempogram with BPM markers
-
-        # plt.subplot(4, 2, 8)
-        # Tgram = librosa.feature.tempogram(y=y, sr=sr)
-        
-
-# y, sr = librosa.load(PROCESS_AUDIO_PATH + '2pI1zTabdot2INoDFeIrhD.wav')
-# mc = librosa.feature.melspectrogram(y=y)
-# mf = librosa.feature.mfcc(y=y)
-# plt.plot(spec)
-# plt.show()
 
