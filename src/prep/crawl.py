@@ -59,10 +59,12 @@ def get_random_query():
 
 def get_data():
     util = Utility()
+    id_list = []
     for i in range(DB_SIZE):
         data = get_song()
+        id_list.append(data['song_id'])
         util.get_mp3(data['preview_url'], data['song_id'])
         util.create_entry(data['song_id'], data['artist_id'], data['album_id'], data['popularity'], data['genres'])
-        
+    return id_list
 
 get_data()

@@ -14,5 +14,6 @@ run: train
 
 clean:
 	rm -f data/raw/audio/*.mp3
+	rm -f data/processed/audio/*.wav
 
 
